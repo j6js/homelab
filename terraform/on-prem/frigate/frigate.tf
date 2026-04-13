@@ -58,13 +58,8 @@ resource "docker_container" "frigate" {
   }
 
   volumes {
-    host_path      = "/opt/frigate/clips"
-    container_path = "/clips"
-  }
-
-  volumes {
-    host_path      = "/opt/frigate/recordings"
-    container_path = "/recordings"
+    host_path      = "/opt/frigate/media"
+    container_path = "/media/frigate"
   }
 
   volumes {
