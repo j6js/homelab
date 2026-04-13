@@ -23,7 +23,7 @@ resource "docker_image" "frigate" {
 resource "docker_container" "frigate" {
   name  = "frigate"
   image = docker_image.frigate.name
-  shm_size = 512
+  shm_size = 1024 # 1GB shared memory for recording
   privileged = true
   restart = "unless-stopped"
 
