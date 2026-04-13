@@ -20,7 +20,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 10m0s
-  path: ./clusters/j6js-oceania
+  path: ./kubernetes/clusters/j6js-oceania
   prune: true
   sourceRef:
     kind: GitRepository
