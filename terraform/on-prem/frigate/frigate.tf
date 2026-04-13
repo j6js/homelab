@@ -23,31 +23,37 @@ resource "docker_image" "frigate" {
 resource "docker_container" "frigate" {
   name  = "frigate"
   image = docker_image.frigate.name
+  shm_size = 512
+  privileged = true
+  restart = "unless-stopped"
 
   ports {
-    internal = 8971
+    internal = 8971 # Authenticated UI
     external = 8971
   }
-
   ports {
-    internal = 8555
+    internal = 8555 # WebRTC over UDP
     external = 8555
     protocol = "udp"
   }
-
   ports {
-    internal = 8555
+    internal = 8554 # RTSP
+    external = 8554
+    protocol = "tcp"
+  }
+  ports {
+    internal = 8555 # WebRTC over TCP
     external = 8555
     protocol = "tcp"
   }
 
   devices {
-    host_path      = "/dev/dri"
+    host_path      = "/dev/dri"  # GPU for hwaccel
     container_path = "/dev/dri"  
    }
 
   volumes {
-    host_path      = "/opt/frigate/config"
+    host_path      = "/opt/frigate/config" 
     container_path = "/config"
   }
 
@@ -59,6 +65,19 @@ resource "docker_container" "frigate" {
   volumes {
     host_path      = "/opt/frigate/recordings"
     container_path = "/recordings"
+  }
+
+  volumes {
+    host_path      = "/etc/localtime"
+    container_path = "/etc/localtime:ro"
+  }
+
+  mounts {
+    type   = "tmpfs"
+    target = "/tmp/cache"
+    tmpfs_options {
+      size_bytes = 1000000000
+    }
   }
 }
 
