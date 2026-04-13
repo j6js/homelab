@@ -69,7 +69,8 @@ resource "docker_container" "frigate" {
 
   volumes {
     host_path      = "/etc/localtime"
-    container_path = "/etc/localtime:ro"
+    container_path = "/etc/localtime"
+    read_only = true
   }
 
   mounts {
