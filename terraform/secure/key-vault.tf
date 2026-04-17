@@ -45,9 +45,8 @@ resource "azurerm_key_vault_access_policy" "vault_admin_access_policy" {
 }
 resource "azurerm_key_vault_access_policy" "vault_access_policy" {
   key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azuread_service_principal.secure1_kv_sp.object_id
-
+  tenant_id = azurerm_user_assigned_identity.secure1_vm_identity.tenant_id
+  object_id    = azurerm_user_assigned_identity.secure1_vm_identity.id
   key_permissions = [
     "Get",
     "WrapKey",
@@ -75,9 +74,8 @@ resource "azuread_application" "secure1_app" {
     }
   }
 }
-resource "azuread_application_password" "secure1_kv_client_secret" {
-  application_id = azuread_application.secure1_app.id
-}
-resource "azuread_service_principal" "secure1_kv_sp" {
-  client_id = azuread_application.secure1_app.client_id
+resource "azurerm_user_assigned_identity" "secure1_vm_identity" {
+  name                = "secure1-vm-identity"
+  resource_group_name = azurerm_resource_group.secure1-rg-nz.name
+  location            = azurerm_resource_group.secure1-rg-nz.location
 }

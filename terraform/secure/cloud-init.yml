@@ -1,23 +1,20 @@
 #cloud-config
 write_files:
   - path: /run/cloud-init/vault.hcl
-    permissions: "0644"
+    permissions: "0600"
     content: |
       api_addr = "https://${external_domain}"
       seal "azurekeyvault" {
         vault_name = "${vault_name}"
         key_name = "${vault_key_name}"
         client_id = "${vault_client_id}"
-        client_secret = "${vault_client_secret}"
         tenant_id = "${vault_tenant_id}"
       }
       ui = true
       disable_mlock = true
-      storage "s3" {
-        bucket = "${cf_r2_bucket_name}"
-        endpoint = "https://${cf_account_id}.r2.cloudflarestorage.com"
-        access_key = "${cf_r2_access_key_id}"
-        secret_key = "${cf_r2_secret_key}"      
+      storage "raft" {
+        path = "/opt/vault/data"
+        node_id = "secure1-vm"
       }
       listener "tcp" {
         address = "127.0.0.1:8200"
@@ -65,7 +62,7 @@ write_files:
       [Install]
       WantedBy=multi-user.target
   - path: /run/cloud-init/Caddyfile
-    permissions: "0644"
+    permissions: "0600"
     content: |
           {
             acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
@@ -112,10 +109,13 @@ runcmd:
   - "echo 'VAULT_CONFIG=/etc/vault.d' | sudo tee /etc/environment"
   - "echo 'VAULT_ADDR=https://${external_domain}' | sudo tee -a /etc/environment"
   - "sudo xcaddy build --with github.com/caddy-dns/cloudflare --output /usr/bin/caddy"
-  - "sudo cp /run/cloud-init/Caddyfile /etc/caddy/Caddyfile # Move the Caddyfile just before Caddy has started & but after installed & setup"
+  - "sudo mv /run/cloud-init/Caddyfile /etc/caddy/Caddyfile # Move the Caddyfile just before Caddy has started & but after installed & setup"
   - "sudo chown caddy:caddy /etc/caddy/Caddyfile"
-  - "sudo cp /run/cloud-init/vault.hcl /etc/vault.d/vault.hcl # Move the config file after Vault has started & installed because apt overwrites it initially"
+  - "sudo mv /run/cloud-init/vault.hcl /etc/vault.d/vault.hcl # Move the config file after Vault has started & installed because apt overwrites it initially"
   - "sudo chown vault:vault /etc/vault.d/vault.hcl"
+  - "sudo mkdir -p /opt/vault/data"
+  - "sudo chown -R vault:vault /opt/vault"
+  - "sudo chmod 700 /opt/vault/data"
   - "sudo systemctl daemon-reload"
   - "sudo systemctl enable --now vault.service"
   - "sudo systemctl restart vault.service"
