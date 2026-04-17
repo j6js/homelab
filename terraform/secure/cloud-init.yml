@@ -1,0 +1,123 @@
+#cloud-config
+write_files:
+  - path: /run/cloud-init/vault.hcl
+    permissions: "0644"
+    content: |
+      api_addr = "https://${external_domain}"
+      seal "azurekeyvault" {
+        vault_name = "${vault_name}"
+        key_name = "${vault_key_name}"
+        client_id = "${vault_client_id}"
+        client_secret = "${vault_client_secret}"
+        tenant_id = "${vault_tenant_id}"
+      }
+      ui = true
+      disable_mlock = true
+      storage "s3" {
+        bucket = "${cf_r2_bucket_name}"
+        endpoint = "https://${cf_account_id}.r2.cloudflarestorage.com"
+        access_key = "${cf_r2_access_key_id}"
+        secret_key = "${cf_r2_secret_key}"      
+      }
+      listener "tcp" {
+        address = "127.0.0.1:8200"
+        tls_disable = 1
+      }
+      listener "tcp" {
+        address = "[::1]:8200"
+        tls_disable = 1
+      }
+  - path: /lib/systemd/system/vault.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description="HashiCorp Vault"
+      Documentation="https://developer.hashicorp.com/vault/docs"
+      Requires=network-online.target
+      After=network-online.target
+      ConditionFileNotEmpty=/etc/vault.d/vault.hcl
+      StartLimitIntervalSec=60
+      StartLimitBurst=3
+
+      [Service]
+      User=vault
+      Group=vault
+      ProtectSystem=full
+      ProtectHome=read-only
+      PrivateTmp=yes
+      PrivateDevices=yes
+      SecureBits=keep-caps
+      AmbientCapabilities=CAP_IPC_LOCK
+      CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+      NoNewPrivileges=yes
+      ExecStart=/usr/bin/vault server -config=/etc/vault.d/vault.hcl
+      ExecReload=/bin/kill --signal HUP
+      KillMode=process
+      KillSignal=SIGINT
+      Restart=on-failure
+      RestartSec=5
+      TimeoutStopSec=30
+      LimitNOFILE=65536
+      LimitMEMLOCK=infinity
+      LimitCORE=0
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /run/cloud-init/Caddyfile
+    permissions: "0644"
+    content: |
+          {
+            acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+          }
+          ${external_domain} {
+            reverse_proxy localhost:8200
+          }
+        
+runcmd:
+  - "wget -O - https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg"
+  - | 
+    cat <<EOF > /etc/apt/sources.list.d/wazuh.sources
+    Types: deb
+    URIs: https://packages.wazuh.com/4.x/apt/
+    Suites: stable
+    Components: main
+    Signed-By: /usr/share/keyrings/wazuh.gpg
+    EOF
+  - "wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg"
+  - |
+    cat <<EOF > /etc/apt/sources.list.d/hashicorp.sources
+    Types: deb
+    URIs: http://apt.releases.hashicorp.com/
+    Suites: $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs)
+    Components: main
+    Signed-By: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    EOF
+  - "wget -O - https://dl.cloudsmith.io/public/caddy/xcaddy/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/caddy-xcaddy-archive-keyring.gpg"
+  - |
+    cat <<EOF > /etc/apt/sources.list.d/xcaddy.sources
+    Types: deb
+    URIs: https://dl.cloudsmith.io/public/caddy/xcaddy/deb/debian
+    Suites: any-version
+    Components: main
+    Signed-By: /usr/share/keyrings/caddy-xcaddy-archive-keyring.gpg
+    EOF
+  - "sudo apt install ca-certificates gnupg lsb-release apt-transport-https -y" # Install http support before loading the repo 
+  - "sudo apt update && sudo apt install vault xcaddy golang curl -y"
+  - "sudo groupadd --system caddy"
+  - "sudo useradd --system --gid caddy --create-home --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy"
+  - "mkdir /etc/caddy"
+  - "sudo chown caddy:caddy /etc/caddy && sudo chown caddy:caddy /etc/caddy/Caddyfile"
+  - "curl -fsSL https://raw.githubusercontent.com/caddyserver/dist/refs/heads/master/init/caddy.service -o /lib/systemd/system/caddy.service"
+  - "echo 'VAULT_CONFIG=/etc/vault.d' | sudo tee /etc/environment"
+  - "echo 'VAULT_ADDR=https://${external_domain}' | sudo tee -a /etc/environment"
+  - "sudo xcaddy build --with github.com/caddy-dns/cloudflare --output /usr/bin/caddy"
+  - "sudo cp /run/cloud-init/Caddyfile /etc/caddy/Caddyfile # Move the Caddyfile just before Caddy has started & but after installed & setup"
+  - "sudo chown caddy:caddy /etc/caddy/Caddyfile"
+  - "sudo cp /run/cloud-init/vault.hcl /etc/vault.d/vault.hcl # Move the config file after Vault has started & installed because apt overwrites it initially"
+  - "sudo chown vault:vault /etc/vault.d/vault.hcl"
+  - "sudo systemctl daemon-reload"
+  - "sudo systemctl enable --now vault.service"
+  - "sudo systemctl restart vault.service"
+  - "sudo systemctl enable --now caddy.service"
+  - "sudo systemctl restart caddy.service"

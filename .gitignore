@@ -1,0 +1,7 @@
+# Ignore all files in the secrets directory, except for sops-encrypted YAML files
+secrets/*
+!secrets/*.enc.yaml
+# terraform directory & state files (these are considered secrets, containing unencrypted secrets from sops)
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.backup
