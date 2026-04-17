@@ -36,7 +36,7 @@ resource "azurerm_linux_virtual_machine" "secure1-vm" {
   user_data = base64encode(templatefile("${abspath(path.module)}/cloud-init.yml", {
     vault_name = azurerm_key_vault.kv.name,
     vault_key_name = azurerm_key_vault_key.vault_key.name,
-    vault_client_id = azurerm.user_assigned_identity.secure1_vm_identity.client_id,
+    vault_client_id = azurerm_user_assigned_identity.secure1_vm_identity.client_id,
     vault_tenant_id = azurerm_user_assigned_identity.secure1_vm_identity.tenant_id,
     cf_account_id = data.sops_file.cloudflare.data["account_id"],
     cf_r2_access_key_id = data.sops_file.cloudflare.data["r2_access_key_id"],
@@ -46,5 +46,8 @@ resource "azurerm_linux_virtual_machine" "secure1-vm" {
   }))
   identity {
     type = "UserAssigned"
+    identity_ids = [
+      azurerm_user_assigned_identity.secure1_vm_identity.id
+    ]
   }
 }
