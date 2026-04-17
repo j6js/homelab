@@ -46,7 +46,7 @@ resource "azurerm_key_vault_access_policy" "vault_admin_access_policy" {
 resource "azurerm_key_vault_access_policy" "vault_access_policy" {
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id = azurerm_user_assigned_identity.secure1_vm_identity.tenant_id
-  object_id    = azurerm_user_assigned_identity.secure1_vm_identity.id
+  object_id    = azurerm_user_assigned_identity.secure1_vm_identity.principal_id
   key_permissions = [
     "Get",
     "WrapKey",
