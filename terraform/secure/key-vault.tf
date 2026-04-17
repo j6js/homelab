@@ -53,27 +53,6 @@ resource "azurerm_key_vault_access_policy" "vault_access_policy" {
     "UnwrapKey"
   ]
 }
-
-# --- Azure Entra ID stuff ---
-resource "azuread_application" "secure1_app" {
-  display_name     = "secure1_vault"
-  sign_in_audience = "AzureADMyOrg"
-  required_resource_access {
-    resource_app_id = "00000003-0000-0000-c000-000000000000" # Microsoft Graph API
-    resource_access {
-      id = "1bfefb4e-e0b5-418b-a88f-73c46d2cc8e9" # Application.ReadWrite.All
-      type = "Role"
-    }
-    resource_access {
-      id = "19dbc75e-c2e2-444c-a770-ec69d8559fc7" # Directory.ReadWrite.All
-      type = "Role"
-    }
-    resource_access {
-      id = "e1fe6dd8-ba31-4d61-89e7-88639da4683d" # User.Read
-      type = "Scope"
-    }
-  }
-}
 resource "azurerm_user_assigned_identity" "secure1_vm_identity" {
   name                = "secure1-vm-identity"
   resource_group_name = azurerm_resource_group.secure1-rg-nz.name
